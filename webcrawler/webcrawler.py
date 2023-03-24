@@ -114,6 +114,7 @@ def create_socket():
     except socket.error:
         sys.exit("Connection error.")
 
+
 # Helper function to generate a cookie string to be sent in cookie field
 def get_cookie_string(session_cookie=None, csrf_cookie=None):
     string = ""
@@ -260,7 +261,7 @@ def main():
     
     """
     # Parse the username and password from the command line
-    username, password = parse_cmd_line(username, password)
+    username, password = parse_cmd_line()
     
     # Create TLS wrapped socket
     wrapped_socket = create_socket()
