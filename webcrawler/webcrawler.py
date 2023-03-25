@@ -60,28 +60,6 @@ class FakebookHTMLParser(HTMLParser):
 
 
 
-# Pareses http response
-def parse_http_response(data):
-    responseDict = {}
-    data = data.split(CRLF)
-    header = filter(None, data[0].split("\r\n"))
-
-    body = data[1] if len(data) > 1 else ""
-    status = header[0].split(" ")[1]
-
-    responseDict["Status"] = status
-    responseDict["Body"] = body
-
-    for x in range(1, len(header)):
-        pair = header[x].split(": ")
-        if pair[0] in responseDict:
-            responseDict[pair[0]] += "| " + pair[1]
-        else:
-            responseDict[pair[0]] = pair[1]
-    return responseDict
-
-
-
 #Parses the command line arguments for username and password. Throws error for invalid info
 def parse_cmd_line():
    
@@ -114,9 +92,22 @@ def create_socket():
     except socket.error:
         sys.exit("Connection error.")
 
+def find_status_code(response):
+    """
+    Parses the HTTP response (given) and grabs the
+    status code and returns it.
+    :param response: String - the HTTP response to parse
+    :return: Integer - the Status code
+    """
+    first_line = response.split('\n', 1)[0]
+    if len(first_line):
+        code = first_line[9:12]
+    else:
+        code = 500
+    return int(code)
 
 # Helper function to generate a cookie string to be sent in cookie field
-def get_cookie_string(session_cookie=None, csrf_cookie=None):
+def get_cookie_string(csrf_cookie=None, session_cookie=None):
     string = ""
     if csrf_cookie:
         if session_cookie:
@@ -125,6 +116,7 @@ def get_cookie_string(session_cookie=None, csrf_cookie=None):
             string = "csrftoken=%s" % (csrf_cookie)
     elif session_cookie:
         string = "sessionid=%s" % (session_cookie)
+        
     return string
 
 
@@ -134,11 +126,15 @@ def send_get_request(path, sock, host, cookie1=None, cookie2=None):
     write code to send request along with appropriate header fields, and handle cookies. Send this header
     file to the server using socket
     """
-    cookies = "Cookie:" + get_cookie_string(cookie1, cookie2)
-
-    headers = "GET %s HTTP/1.1\r\nHost: %s\r\n%s\r\n" % (path, host, cookies)
+    # cookies = "Cookie:" + get_cookie_string(cookie1, cookie2)
+    cookies = get_cookie_string(cookie1, cookie2)
+    if not cookies:
+        headers = "GET %s HTTP/1.1\r\nHost: %s\r\n\r\n" % (path, host)
+    else:
+        headers = "GET %s HTTP/1.1\r\nHost: %s\r\nCookie: %s\r\n\r\n" % (path, host, cookies)
 
     sock.send(headers.encode())
+
 
 # this function will help you to receive message from the server for any request sent by the client
 def receive_msg(sock):
@@ -146,14 +142,23 @@ def receive_msg(sock):
     Receive the message in a loop based on the content length given in the header
     Return received message
     """
-    msg = ""
-    while True:
-        data = sock.recv(1024)
-        if not data:
-            break
-        msg += data.decode("utf-8")
-        if "\r\n\r\n" in msg:
-            break
+    msg = sock.recv(4096).decode()
+    length = getContent_length(msg)
+
+    print("contetn length " + str(length))
+    
+    # while True:
+    #     try:
+    #         data = sock.recv(4096)
+    #         if not data:
+    #             break
+    #         msg += data.decode()
+    #         if "\r\n\r\n" in msg:
+    #             break
+    #         if msg.find("</html>") >= 0:
+    #             break
+    #     except: 
+    #         break
     return msg
 
     
@@ -173,41 +178,39 @@ def cookie_jar(msg):
     Stores the session and/or the csrf cookies
     return cookies
     """
-    cookies = {}
+    sessionid = None
+    csrftoken = None
     for header in msg.split("\r\n"):
         if "Set-Cookie:" in header:
             if "sessionid" in header:
-                cookie = header.split("sessionid=")[1].split(";")[0]
-                cookeis["session"] = cookie
+                sessionid = header.split("sessionid=")[1].split(";")[0]
             elif "csrftoken" in header:
-                cookie = header.split("csrftoken")[1].split(";")[0]
-                cookies["csrftoken"] = cookie
-    return cookies
+                csrftoken = header.split("csrftoken=")[1].split(";")[0]
+
+    return sessionid, csrftoken
 
 
 
 #this function will help you to send the  request to login
-def login_user(sock, path, host, body_len, body, cookie1, cookie2):
+def login_user(sock, path, host, body_len, body, cookie1, cookie2=None):
    """
    create a  request and send it to login to the fakebook site
    """
+   cookies_str = get_cookie_string(cookie1, cookie2)
+
    # create the login request msg
    topMsg = "POST %s HTTP/1.1\r\nHost: %s\r\nConnection: close" % (path, host)
    contentType = "Content-Type: application/x-www-form-urlencoded"
    contentLen = "Content-Length: %s" % (body_len)
-   cookies = "Cookie:" + get_cookie_string(cookie1, cookie2)
+   cookies = "Cookie: %s" % (cookies_str)
    
-   request = topMsg + "\r\n" + contentType + "\r\n" + contentLen + "\r\n" + cookies + "\r\n" + body + "\r\n"
+   request = topMsg + "\r\n" + contentType + "\r\n" + contentLen + "\r\n" + cookies + CRLF + body + CRLF
    
    # send the login request and receive the response
-   soeck.send(request.encode())
+   sock.send(request.encode())
    response = receive_msg(sock)
-   
-   # extract and save the session and csrf cookies
-   cookies = cookie_jar(response)
-   session_id = cookies.get("session")
-   csrf_token = cookies.get("csrftoken")
-   return
+
+   return response
 
 
 def start_crawling(msg, sock, host, cookie3, cookie4):
@@ -216,6 +219,7 @@ def start_crawling(msg, sock, host, cookie3, cookie4):
     You can use the HTML Parser object to parse through the current URL in search for more URLs and/or secret flags until all
     secret flags are found for the user.
     Also accounts for and appropriately handles different errors received when parsing through pages.
+    msg: http response msg
     """
     global queued_pages, crawled_pages, flags, csrf_token, session_id
 
@@ -241,76 +245,72 @@ def main():
     fakebook_path = "/fakebook/"
     login_path = "/accounts/login/?next=/fakebook/"
 
-    """  
-    You can follow the following setps
-
-    # Parse the username and password from the command line
-    # Create TLS wrapped socket
-    # get the root page
-    # check the received message
-    # store session cookie
-    # send get request for login page
-    # check message for login page
-    # retrieving csrf cookie and middleware token
-    # creating login body for user
-    # login user
-    # store new cookies
-    # send request to go to my fakebook page
-    # start your crawler
-    # close the socket - program end
-    
-    """
     # Parse the username and password from the command line
     username, password = parse_cmd_line()
     
     # Create TLS wrapped socket
-    wrapped_socket = create_socket()
+    mysocket = create_socket()
 
     # get the root page
-    send_get_request(root_path, wrapped_socket, host)
+    send_get_request(root_path, mysocket, host)
 
     # check the received message
-    root_msg = receive_msg(wrapped_socket)
+    root_msg = receive_msg(mysocket)
+    # print(root_msg)
+
     if "200 OK" not in root_msg:
         print("Failed to get root page")
         return
     
     # store session cookie
-    cookies = cookie_jar(root_msg)
-    session_id = cookies["session"]
+    # middleware token only use once in login request
+    session_id, csrf_token = cookie_jar(root_msg)
+    print("session_id:" + session_id)
 
     # send get request for login page
-    send_get_request(login_path, wrapped_socket, host)
-    login_msg = receive_msg(wrapped_socket)
+    send_get_request(login_path, mysocket, host, csrf_token, session_id)
+    login_msg = receive_msg(mysocket)
+    get_login_status = find_status_code(login_msg)
 
     # check message for login page
-    if "200 OK" not in login_msg:
+    if get_login_status != 200:
         print("Failed to get login page")
         return 
 
     # retrieving csrf cookie and middleware token
-    cookies = cookie_jar(login_msg)
-    csrf_token = cookies["csrftoken"]   # middleware token only use once in login request
+    session_id, csrf_token = cookie_jar(login_msg)
+
 
     # creating login body for user
-    login_body = {
-        "username": username,
-        "password": password,
-        "csrfmiddlewaretoken": csrf_token
-    }
+    login_body = "username=%s&password=%s&csrfmiddlewaretoken=%s&next=/fakebook/" % (username, password, csrf_token)
     login_body_len = str(len(login_body))
 
-    # login user and store new cookies to session_id and csrf_token
-    login_user(sock, login_path, host, login_body_len, login_body, session_id, csrf_token)
+    # login user 
+    login_res = login_user(mysocket, login_path, host, login_body_len, login_body, csrf_token, session_id)
+    login_status = find_status_code(login_res)
+    # check login status
+    if login_status != 302:
+        print("Failed to login")
+        return  
+
+    # store new cookies to session_id and csrf_token
+    session_id, csrf_token = cookie_jar(login_res)
 
     # send request to go to my fakebook page
-    send_get_request(fakebook_path, wrapped_socket, host)
-    fakebook_msg = receive_msg(wrapped_socket)
+    send_get_request(fakebook_path, mysocket, host, csrf_token, session_id)
+    fakebook_msg = receive_msg(mysocket)
+    fakebook_status = find_status_code(fakebook_msg)
+    print("fakebook msg: " + fakebook_msg)
+    
+    # check if get page successed
+    if fakebook_status != 200:
+        print("Failed to get fakebook page")
+        return 
 
     # start your crawler
 
     # close the socket - program end
-    wrapped_socket.close()
+    mysocket.close()
 
 
 if __name__ == "__main__":
