@@ -151,10 +151,10 @@ def receive_msg(sock):
         try:
             if length == None or length == 0:
                 break
-            elif msg.find("</html>") >= 0:
-                break
-            else:
+            elif not msg.endswith("</html>\n"):
                 msg += sock.recv(4096).decode()
+            else:
+                break
         except: 
             break
 
@@ -203,7 +203,7 @@ def login_user(sock, path, host, body_len, body, cookie1, cookie2):
    contentLen = "Content-Length: %d" % (body_len)
    cookies = "Cookie: %s" % (cookies_str)
    
-   request = topMsg + "\r\n" + contentType + "\r\n" + contentLen + "\r\n" + cookies + CRLF + body + CRLF
+   request = topMsg + "\r\n" + contentType + "\r\n" + contentLen + "\r\n" + cookies + CRLF + body
    
    # send the login request and receive the response
    sock.send(request.encode())
@@ -281,7 +281,7 @@ def main():
 
 
     # creating login body for user
-    login_body = "username=%s&password=%s&csrfmiddlewaretoken=%s&next=/fakebook/" % (username, password, csrf_token)
+    login_body = "username=%s&password=%s&csrfmiddlewaretoken=%s&next=/fakebook" % (username, password, csrf_token)
     login_body_len = len(login_body)
 
     # login user 
