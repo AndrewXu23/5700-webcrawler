@@ -22,15 +22,7 @@ To receive a message from a server over a socket connection. The function takes 
 Next, the function calls the getContent_length() function to extract the content length from the received message. If no content length is found, the function exits the loop and returns the message. If a content length is found, the function enters a loop where it receives additional chunks of data from the server until the length of the received message matches the content length specified in the header. The loop also checks to see if the message ends with the </html> tag. If it does, the loop is exited and the full message is returned.(getContent_length() function may not correctly extracting the content length and then cause the error)
 
 8. def getContent_length(msg):
-
-To extract the content length from an HTTP response message received from a server. The function takes msg, which represents the HTTP response message.
-
-The function starts by using the split() method to split the message string into an array based on the "Content-Length:" header field. It then extracts the second element of the resulting array (which should contain the content length) using another split() method call.
-
-Next, the function converts the extracted content length string to an integer using the int() function.
-
-If any errors occur during this process (such as if the message does not contain a valid content length header), the function sets the content_length variable to None.
-
+To extract the content length from an HTTP response message received from a server. The function takes msg, which represents the HTTP response message. The function starts by using the split() method to split the message string into an array based on the "Content-Length:" header field. It then extracts the second element of the resulting array (which should contain the content length) using another split() method call. Next, the function converts the extracted content length string to an integer using the int() function. If any errors occur during this process (such as if the message does not contain a valid content length header), the function sets the content_length variable to None.
 Finally, the function returns the extracted content length value.
 
 9. def cookie_jar(msg):
