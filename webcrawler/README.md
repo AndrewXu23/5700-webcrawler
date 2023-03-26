@@ -36,7 +36,6 @@ This function sends a POST request with the user's login credentials to the spec
 Potential errors in this function could include issues with the request message construction, such as incorrect formatting of the headers or body. It could also encounter issues if the server is down or if the login credentials are incorrect.
 
 
-
 11. def start_crawling(msg, sock, host, cookie3, cookie4):
 This function starts by creating a FakebookHTMLParser object to parse the HTML of each page. It then adds the root page URL to the queue of pages to be crawled.
 The function then enters a loop, where it gets the next URL to crawl from the front of the queue. If the URL has already been crawled, it skips it. Otherwise, it sends a GET request to the URL, receives the response, and parses it for links and flags using the FakebookHTMLParser object.
