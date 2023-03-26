@@ -144,21 +144,20 @@ def receive_msg(sock):
     """
     msg = sock.recv(4096).decode()
     length = getContent_length(msg)
-
+    
     print("contetn length " + str(length))
     
-    # while True:
-    #     try:
-    #         data = sock.recv(4096)
-    #         if not data:
-    #             break
-    #         msg += data.decode()
-    #         if "\r\n\r\n" in msg:
-    #             break
-    #         if msg.find("</html>") >= 0:
-    #             break
-    #     except: 
-    #         break
+    while True:
+        try:
+            if length == None or length == 0:
+                break
+            elif msg.find("</html>") >= 0:
+                break
+            else:
+                msg += sock.recv(4096).decode()
+        except: 
+            break
+
     return msg
 
     
@@ -192,7 +191,7 @@ def cookie_jar(msg):
 
 
 #this function will help you to send the  request to login
-def login_user(sock, path, host, body_len, body, cookie1, cookie2=None):
+def login_user(sock, path, host, body_len, body, cookie1, cookie2):
    """
    create a  request and send it to login to the fakebook site
    """
@@ -201,7 +200,7 @@ def login_user(sock, path, host, body_len, body, cookie1, cookie2=None):
    # create the login request msg
    topMsg = "POST %s HTTP/1.1\r\nHost: %s\r\nConnection: close" % (path, host)
    contentType = "Content-Type: application/x-www-form-urlencoded"
-   contentLen = "Content-Length: %s" % (body_len)
+   contentLen = "Content-Length: %d" % (body_len)
    cookies = "Cookie: %s" % (cookies_str)
    
    request = topMsg + "\r\n" + contentType + "\r\n" + contentLen + "\r\n" + cookies + CRLF + body + CRLF
@@ -283,11 +282,12 @@ def main():
 
     # creating login body for user
     login_body = "username=%s&password=%s&csrfmiddlewaretoken=%s&next=/fakebook/" % (username, password, csrf_token)
-    login_body_len = str(len(login_body))
+    login_body_len = len(login_body)
 
     # login user 
     login_res = login_user(mysocket, login_path, host, login_body_len, login_body, csrf_token, session_id)
     login_status = find_status_code(login_res)
+    print(login_res)
     # check login status
     if login_status != 302:
         print("Failed to login")
