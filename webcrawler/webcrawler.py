@@ -145,7 +145,7 @@ def receive_msg(sock):
     msg = sock.recv(4096).decode()
     length = getContent_length(msg)
     
-    print("contetn length " + str(length))
+    # print("contetn length " + str(length))
     
     while True:
         try:
@@ -198,7 +198,7 @@ def login_user(sock, path, host, body_len, body, cookie1, cookie2):
    cookies_str = get_cookie_string(cookie1, cookie2)
 
    # create the login request msg
-   topMsg = "POST %s HTTP/1.1\r\nHost: %s\r\nConnection: close" % (path, host)
+   topMsg = "POST %s HTTP/1.1\r\nHost: %s" % (path, host)
    contentType = "Content-Type: application/x-www-form-urlencoded"
    contentLen = "Content-Length: %d" % (body_len)
    cookies = "Cookie: %s" % (cookies_str)
@@ -255,17 +255,17 @@ def main():
 
     # check the received message
     root_msg = receive_msg(mysocket)
-    # print(root_msg)
+    root_status = find_status_code(root_msg)
 
-    if "200 OK" not in root_msg:
+    if root_status != 200:
         print("Failed to get root page")
         return
     
     # store session cookie
     # middleware token only use once in login request
     session_id, csrf_token = cookie_jar(root_msg)
-    print("session_id:" + session_id)
 
+    
     # send get request for login page
     send_get_request(login_path, mysocket, host, csrf_token, session_id)
     login_msg = receive_msg(mysocket)
@@ -281,13 +281,13 @@ def main():
 
 
     # creating login body for user
-    login_body = "username=%s&password=%s&csrfmiddlewaretoken=%s&next=/fakebook" % (username, password, csrf_token)
+    login_body = "username=%s&password=%s&csrfmiddlewaretoken=%s&next=" % (username, password, csrf_token)
     login_body_len = len(login_body)
 
     # login user 
     login_res = login_user(mysocket, login_path, host, login_body_len, login_body, csrf_token, session_id)
     login_status = find_status_code(login_res)
-    print(login_res)
+    
     # check login status
     if login_status != 302:
         print("Failed to login")
@@ -300,7 +300,6 @@ def main():
     send_get_request(fakebook_path, mysocket, host, csrf_token, session_id)
     fakebook_msg = receive_msg(mysocket)
     fakebook_status = find_status_code(fakebook_msg)
-    print("fakebook msg: " + fakebook_msg)
     
     # check if get page successed
     if fakebook_status != 200:
