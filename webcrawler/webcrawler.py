@@ -235,6 +235,32 @@ def start_crawling(msg, sock, host, cookie3, cookie4):
     #     try:
 
 
+    """
+    #Zihan's solution:
+    while len(queued_pages) > 0:
+        # get the next url to crawl
+        url = queued_pages.pop(0)
+
+        # check if the url has already been crawled
+        if url in crawled_pages:
+            continue
+
+        # send a GET request for the page
+        send_get_request(url, sock, host, cookie3, cookie4)
+
+        # receive the response
+        response = receive_msg(sock)
+
+        # parse the response for links and flags
+        parser.feed(response)
+
+        # add the url to the list of crawled pages
+        crawled_pages.append(url)
+
+    # return the list of found flags
+    return flags
+    
+    """
 
 
 
